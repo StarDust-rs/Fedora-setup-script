@@ -83,7 +83,7 @@ while url:
             time.sleep(2 ** attempt)
 
     for release in releases:
-        if release.get("draft") or release.get("prerelease"):
+        if release.get("draft"):
             continue
         for asset in release.get("assets", []):
             name = asset.get("name", "")
