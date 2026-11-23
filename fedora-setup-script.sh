@@ -784,7 +784,7 @@ log "Enabling NumLock for KDE Plasma and Plasma Login Manager"
 if command -v kwriteconfig6 >/dev/null 2>&1; then
     run_optional \
         "Could not configure per-user Plasma NumLock." \
-        kwriteconfig6 --file kcminputrc --group Keyboard --key NumLock 1
+        kwriteconfig6 --file kcminputrc --group Keyboard --key NumLock 0
 else
     warn "kwriteconfig6 unavailable; skipping per-user NumLock configuration."
 fi
