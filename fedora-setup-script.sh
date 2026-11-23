@@ -991,12 +991,26 @@ fi
 
 log "Installing Morphe Desktop"
 
-MORPHE_INSTALL_URL="https://raw.githubusercontent.com/Stark-0505/Fedora-setup-script/main/morphe-install.sh"
-MORPHE_INSTALL_TMP="$(mktemp)"
+# Prefer the installer shipped beside this script. This also makes ZIP-based
+# installs work without a second download. Fall back to this repository's raw
+# URL only when the bundled file is unavailable.
+MORPHE_INSTALL_URL="https://raw.githubusercontent.com/StarDust-rs/Fedora-setup-script/main/morphe-install.sh"
+MORPHE_INSTALL_TMP=""
+MORPHE_INSTALLER=""
 
-if curl -fLsS --retry 3 --retry-all-errors --connect-timeout 20 \
-    "$MORPHE_INSTALL_URL" -o "$MORPHE_INSTALL_TMP"; then
-    if bash "$MORPHE_INSTALL_TMP"; then
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+if [[ -f "$SCRIPT_DIR/morphe-install.sh" && -r "$SCRIPT_DIR/morphe-install.sh" ]]; then
+    MORPHE_INSTALLER="$SCRIPT_DIR/morphe-install.sh"
+elif command -v curl >/dev/null 2>&1; then
+    MORPHE_INSTALL_TMP="$(mktemp)"
+    if curl -fLsS --retry 3 --retry-all-errors --connect-timeout 20 \
+        "$MORPHE_INSTALL_URL" -o "$MORPHE_INSTALL_TMP"; then
+        MORPHE_INSTALLER="$MORPHE_INSTALL_TMP"
+    fi
+fi
+
+if [[ -n "$MORPHE_INSTALLER" ]]; then
+    if bash "$MORPHE_INSTALLER"; then
         ok "Morphe Desktop installed."
         record_success "Morphe Desktop installed."
     else
@@ -1004,10 +1018,13 @@ if curl -fLsS --retry 3 --retry-all-errors --connect-timeout 20 \
         record_warning "Morphe Desktop installation failed."
     fi
 else
-    warn "Could not download the Morphe Desktop installer; continuing Fedora setup."
+    warn "Could not locate or download the Morphe Desktop installer; continuing Fedora setup."
     record_warning "Morphe Desktop installer download failed."
 fi
-rm -f "$MORPHE_INSTALL_TMP"
+
+if [[ -n "$MORPHE_INSTALL_TMP" ]]; then
+    rm -f -- "$MORPHE_INSTALL_TMP"
+fi
 
 ###############################################################################
 # 21. Final status
