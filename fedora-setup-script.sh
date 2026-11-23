@@ -653,20 +653,60 @@ log "Configuring VS Code as the default text editor"
 
 if command -v xdg-mime >/dev/null 2>&1 && command -v code >/dev/null 2>&1; then
     VSCODE_DESKTOP_ID=""
-    for candidate in code.desktop com.visualstudio.code.desktop; do
-        if [[ -f "/usr/share/applications/$candidate" ]] ||
-           [[ -f "$REAL_HOME/.local/share/applications/$candidate" ]]; then
-            VSCODE_DESKTOP_ID="$candidate"
-            break
-        fi
+
+    # Prefer known desktop IDs, but verify that each entry launches VS Code.
+    # Package variants can use different IDs, and a stale unrelated entry
+    # must not be selected only because its filename matches.
+    VSCODE_DESKTOP_CANDIDATES=(
+        code.desktop
+        com.visualstudio.code.desktop
+        code-beta.desktop
+        code-insiders.desktop
+        code-oss.desktop
+    )
+
+    for candidate in "${VSCODE_DESKTOP_CANDIDATES[@]}"; do
+        for app_dir in \
+            "$REAL_HOME/.local/share/applications" \
+            /usr/local/share/applications \
+            /usr/share/applications
+        do
+            desktop_file="$app_dir/$candidate"
+            if [[ -f "$desktop_file" ]] &&
+               grep -Eq '^Name=.*Visual Studio Code|^Name=Code([[:space:]]|$)' "$desktop_file" &&
+               grep -Eq '^Exec=.*(^|[ /])(code|code-beta|code-insiders|code-oss)([[:space:]]|$)' "$desktop_file"; then
+                VSCODE_DESKTOP_ID="$candidate"
+                break 2
+            fi
+        done
     done
+
+    # If the package uses an unexpected desktop ID, discover it by its
+    # visible application name and executable instead of failing by filename.
+    if [[ -z "$VSCODE_DESKTOP_ID" ]]; then
+        for app_dir in \
+            "$REAL_HOME/.local/share/applications" \
+            /usr/local/share/applications \
+            /usr/share/applications
+        do
+            [[ -d "$app_dir" ]] || continue
+            for desktop_file in "$app_dir"/*.desktop; do
+                [[ -f "$desktop_file" ]] || continue
+                if grep -Eq '^Name=.*Visual Studio Code|^Name=Code([[:space:]]|$)' "$desktop_file" &&
+                   grep -Eq '^Exec=.*(^|[ /])(code|code-beta|code-insiders|code-oss)([[:space:]]|$)' "$desktop_file"; then
+                    VSCODE_DESKTOP_ID="${desktop_file##*/}"
+                    break 2
+                fi
+            done
+        done
+    fi
 
     if [[ -n "$VSCODE_DESKTOP_ID" ]] &&
        xdg-mime default "$VSCODE_DESKTOP_ID" text/plain &&
        [[ "$(xdg-mime query default text/plain 2>/dev/null || true)" == "$VSCODE_DESKTOP_ID" ]]; then
-        ok "VS Code configured as the text/plain editor."
+        ok "VS Code configured as the text/plain editor ($VSCODE_DESKTOP_ID)."
     else
-        warn "Could not set VS Code as the text/plain default (desktop handler not found or MIME update failed)."
+        warn "Could not set VS Code as the text/plain default (no matching desktop entry or MIME update failed)."
         record_warning "Could not set VS Code as the text/plain default."
     fi
 else
